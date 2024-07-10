@@ -1,0 +1,44 @@
+Set a = 1.0
+Set b = True
+Set c = a + b
+Set d = 1.0 + 2.0
+Create Function do (a, Set b = c) {
+    Set f = 2.0
+}
+
+Iterate Through True {
+    Set g = False
+}
+
+Iterate From 1.0 To 2.0 {
+    Set H = False
+}
+
+If True {
+    Set T = True
+}
+Else {
+    Set F = False
+}
+
+If True {
+    Set T = True
+}
+
+Iterate Until True {
+    Set F = False
+}
+
+Create Class A {
+    Set a = 1.0
+}
+
+Create Function do (a, Set b = c) {
+    Set f = 2.0
+    Return f
+    Return
+    Increment F
+    Increment F By 2.0
+    Decrement G 
+    Decrement G By 1.0
+}
