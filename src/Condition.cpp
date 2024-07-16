@@ -2,9 +2,12 @@
 #include "CodeGenContext.h"
 #include "Node.h"
 #include "Visitor.h"
+#include "llvm/ADT/APFloat.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
+#include "llvm/Support/raw_ostream.h"
 #include <string>
 
 namespace monk {
@@ -21,22 +24,30 @@ void Condition::Accept(Visitor *v) { v->VisitCondition(this); }
 llvm::Value *Condition::codegen(CodeGenContext &context) {
   llvm::Value *value = condition->codegen(context);
 
-  if (!value->getType()->isDoubleTy()) {
-    context.add_error("Not a Boolean");
+  if (!value) {
+    context.add_error("Not a Boolean Condition");
     return nullptr;
   }
 
+  value = context.getBuilder()->CreateFCmpONE(
+      value,
+      llvm::ConstantFP::get(context.getGlobalContext(), llvm::APFloat(1.0)),
+      "cond");
+
   llvm::Function *function = context.get_current_block()->getParent();
+
   llvm::BasicBlock *ifBlock =
-      llvm::BasicBlock::Create(context.getGlobalContext(), "then", function);
+      llvm::BasicBlock::Create(context.getGlobalContext(), "if", function);
   llvm::BasicBlock *elseBlock =
       llvm::BasicBlock::Create(context.getGlobalContext(), "else");
+
   llvm::BasicBlock *mergeBlock =
       llvm::BasicBlock::Create(context.getGlobalContext(), "merge");
+
   llvm::BranchInst::Create(ifBlock, elseBlock, value,
                            context.get_current_block());
 
-  bool merge_block_needed = false;
+  context.getBuilder()->SetInsertPoint(ifBlock);
   context.new_scope(ifBlock);
 
   llvm::Value *ifVal = if_block->codegen(context);
@@ -44,10 +55,8 @@ llvm::Value *Condition::codegen(CodeGenContext &context) {
     return nullptr;
   }
 
-  if (context.get_current_block()->getTerminator() == nullptr) {
-    llvm::BranchInst::Create(mergeBlock, context.get_current_block());
-    merge_block_needed = true;
-  }
+  context.getBuilder()->CreateBr(mergeBlock);
+  ifBlock = context.getBuilder()->GetInsertBlock();
 
   context.end_scope();
 
@@ -55,24 +64,39 @@ llvm::Value *Condition::codegen(CodeGenContext &context) {
 
   llvm::Value *elseVal = nullptr;
   if (else_block != nullptr) {
+    function->insert(function->end(), elseBlock);
+    context.getBuilder()->SetInsertPoint(elseBlock);
     elseVal = else_block->codegen(context);
-    if(elseVal == nullptr) {
+    if (elseVal == nullptr) {
       return nullptr;
     }
-  }
 
-  if (context.get_current_block()->getTerminator() == nullptr) {
-    llvm::BranchInst::Create(mergeBlock, context.get_current_block());
-    merge_block_needed = true;
+    context.getBuilder()->CreateBr(mergeBlock);
+    elseBlock = context.getBuilder()->GetInsertBlock();
   }
 
   context.end_scope();
 
-  if (merge_block_needed) {
-    context.set_current_block(mergeBlock);
-  }
+  context.new_scope(mergeBlock);
+  function->insert(function->end(), mergeBlock);
+  context.getBuilder()->SetInsertPoint(mergeBlock);
 
-  return mergeBlock;
+  llvm::PHINode *pn =
+      llvm::PHINode::Create(llvm::Type::getDoubleTy(context.getGlobalContext()),
+                            2, "mergetmp", context.get_current_block());
+  pn->addIncoming(ifVal, ifBlock);
+  pn->addIncoming(elseVal, elseBlock);
+  llvm::AllocaInst *alloc =
+      new llvm::AllocaInst(llvm::Type::getDoubleTy(context.getGlobalContext()),
+                           0, "cond_res", context.get_current_block());
+  new llvm::StoreInst(pn->getValueName()->getValue(), alloc, false,
+                      context.get_current_block());
+  llvm::ReturnInst::Create(context.getGlobalContext(), 0,
+                           context.get_current_block());
+
+  context.end_scope();
+
+  return 0;
 }
 
 std::string Condition::toString() { return "Condition"; }

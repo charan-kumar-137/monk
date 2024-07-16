@@ -3,8 +3,8 @@ Set a = 1.0
 Set b = 1.0 + 2.0
 Set c = 1.0
 
-If 1.0 {
-    Set d = 2.0
+If c {
+    2.0
 } Else {
-    Set e = 3.0
+    2.0
 }

@@ -62,7 +62,7 @@ bool CodeGenContext::generateCode(Block &block) {
     outs << "Error: " << error << "\n";
   }
 
-  if (llvm::verifyModule(*getModule())) {
+  if (llvm::verifyModule(*getModule(), &llvm::errs())) {
     outs << ": Error constructing function!\n";
   }
 

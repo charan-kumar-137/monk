@@ -27,14 +27,18 @@ llvm::Value *VarDecl::codegen(CodeGenContext &context) {
 
   llvm::AllocaInst *alloc = new llvm::AllocaInst(
       type, 0, identifier->get_name()->c_str(), context.get_current_block());
-  
+
   value = alloc;
   context.add_variable(identifier, alloc);
 
-  value = expression->codegen(context);
+  if (expression != nullptr) {
+    value = expression->codegen(context);
 
+    return new llvm::StoreInst(value, alloc, false,
+                               context.get_current_block());
+  }
 
-  return new llvm::StoreInst(value, alloc, false, context.get_current_block());
+  return nullptr;
 }
 
 void VarDecl::Accept(Visitor *v) { v->VisitVarDecl(this); }
